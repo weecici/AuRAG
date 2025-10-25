@@ -1,0 +1,23 @@
+from pydantic import BaseModel, Field
+
+
+class IngestRequest(BaseModel):
+    file_paths: list[str] = Field(
+        default=[], description="List of file paths to ingest documents from"
+    )
+    file_dir: str = Field(
+        default="", description="Directory containing files to ingest"
+    )
+    collection_name: str = Field(
+        default="documents", description="Name of the Qdrant collection"
+    )
+
+
+class RetrievalQuery(BaseModel):
+    queries: list[str] = Field(..., description="The list of query texts")
+    collection_name: str = Field(
+        default="documents", description="Name of the Qdrant collection"
+    )
+    top_k: int = Field(
+        default=5, description="Number of top similar documents to retrieve"
+    )
