@@ -25,9 +25,9 @@ def encode_texts(
 
     embeddings = model.encode(
         sentences=prefixed_texts,
-        convert_to_tensor=True,
         truncate_dim=dim,
         batch_size=batch_size,
+        convert_to_numpy=True,
     )
 
     return embeddings.tolist()

@@ -18,7 +18,7 @@ def process_documents(file_paths: list[str], file_dir: str) -> list[TextNode]:
         doc.doc_id = doc.metadata.get("file_name", "unknown").split(".")[0]
         chunks = splitter.split_text(doc.text)
         for idx, chunk in enumerate(chunks):
-            node_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, doc.doc_id))
+            node_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{doc.doc_id}_{idx}"))
 
             node = TextNode(
                 id_=node_id,
