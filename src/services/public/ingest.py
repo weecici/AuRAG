@@ -7,7 +7,7 @@ from src.repo.qdrant import upsert_nodes
 
 def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
     try:
-        request = schemas.IngestRequest.model_validate(ctx.event.request)
+        request = schemas.IngestRequest.model_validate(ctx.event.data)
         if not request.file_paths and not request.file_dir:
             raise ValueError("No file paths or directory provided in event data.")
 

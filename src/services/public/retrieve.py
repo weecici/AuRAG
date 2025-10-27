@@ -2,7 +2,7 @@ import inngest
 from fastapi import status
 from src import schemas
 from src.services.internal import encode_texts
-from src.repo.qdrant import search_batch_similar_nodes
+from src.repo.qdrant import dense_search
 
 
 def retrieve_documents(ctx: inngest.Context) -> schemas.RetrievalResponse:
@@ -27,7 +27,7 @@ def retrieve_documents(ctx: inngest.Context) -> schemas.RetrievalResponse:
             f"Generated {len(query_embeddings)} query embeddings with each embedding's length is: {len(query_embeddings[0])}"
         )
 
-        results = search_batch_similar_nodes(
+        results = dense_search(
             query_embeddings=query_embeddings,
             collection_name=request.collection_name,
             top_k=request.top_k,
