@@ -1,3 +1,5 @@
+import os
+import json
 from functools import lru_cache
 from qdrant_client import QdrantClient, models
 from llama_index.core.schema import BaseNode
@@ -82,19 +84,8 @@ def upsert_data(
         # Qdrant accepts empty sparse vectors, but keep explicit empty lists
         return models.SparseVector(indices=indices, values=values)
 
-    points: list[models.PointStruct] = [
-        models.PointStruct(
-            id=0,
-            vector={
-                dense_name: [0.0] * vector_size,
-                sparse_name: models.SparseVector(indices=[], values=[]),
-            },
-            payload={
-                "vocab": vocab,
-            },
-        )
-    ]
-
+    # Build Qdrant PointStructs from nodes and their dense/sparse embeddings
+    points: list[models.PointStruct] = []
     for i, node in enumerate(nodes):
         vector_map: dict[str, object] = {
             dense_name: dense_embeddings[i],
@@ -112,10 +103,16 @@ def upsert_data(
             )
         )
 
+    # Upsert points to Qdrant
     out = client.upsert(
         collection_name=collection_name,
         points=points,
     )
+
+    # Storing vocab on local disk for later use
+    vocab_path = os.path.join(config.DISK_STORAGE_PATH, f"{collection_name}_vocab.json")
+    with open(vocab_path, "w") as f:
+        json.dump(vocab, f)
 
     # Qdrant returns UpdateStatus.ACKNOWLEDGED or COMPLETED
     if out.status not in (
