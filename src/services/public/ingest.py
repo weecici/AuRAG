@@ -1,7 +1,7 @@
 import inngest
 from fastapi import status
 from src import schemas
-from src.services.internal import process_documents, dense_encode
+from src.services.internal import process_documents, dense_encode, sparse_encode
 from src.repo.qdrant import upsert_nodes
 
 
@@ -24,24 +24,33 @@ def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
 
         ctx.logger.info(f"Processed {len(nodes)} chunks with UUIDs and metadata.")
 
-        embeddings = dense_encode(
+        # Create dense embeddings for the nodes
+        dense_embeddings = dense_encode(
             texts=[node.text for node in nodes],
             titles=[node.metadata.get("title", "none") for node in nodes],
             text_type="document",
         )
 
-        if len(embeddings) != len(nodes):
+        if len(dense_embeddings) != len(nodes):
             raise ValueError(
-                f"Embeddings generation failed or returned incorrect count: {len(embeddings)}"
+                f"Embeddings generation failed or returned incorrect count: {len(dense_embeddings)}"
             )
 
         ctx.logger.info(
-            f"Generated {len(nodes)} embeddings with each embedding's length is: {len(embeddings[0])}"
+            f"Generated {len(nodes)} dense embeddings with each embedding's size is: {len(dense_embeddings[0])}"
         )
 
         # Attach embeddings to nodes
-        for node, embedding in zip(nodes, embeddings):
+        for node, embedding in zip(nodes, dense_embeddings):
             node.embedding = embedding
+
+        # Create sparse embeddings for the nodes
+        sparse_embeddings, vocab = sparse_encode(
+            texts=[node.text for node in nodes],
+            word_process_method="lemmatize",
+        )
+
+        print(f"Generated sparse embeddings shape: {sparse_embeddings.shape}")
 
         # Upsert nodes
         upsert_nodes(nodes=nodes, collection_name=request.collection_name)
