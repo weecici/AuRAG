@@ -2,6 +2,8 @@ from functools import lru_cache
 from qdrant_client import QdrantClient, models
 from llama_index.core.schema import BaseNode
 from src.core import config
+from scipy.sparse import csr_matrix
+from typing import List
 
 
 @lru_cache(maxsize=1)
@@ -41,8 +43,11 @@ def ensure_collection_exists(
     print(f"Created collection '{collection_name}'")
 
 
-def upsert_nodes(
+def upsert_data(
     nodes: list[BaseNode],
+    dense_embeddings: list[list[float]],
+    sparse_embeddings: csr_matrix,
+    vocab: dict[str, int],
     collection_name: str,
     dense_name: str = config.EMBEDDING_MODEL,
     sparse_name: str = config.SPARSE_MODEL,
@@ -51,9 +56,15 @@ def upsert_nodes(
     if not nodes:
         raise ValueError("No nodes provided for upserting")
 
-    if not all(node.embedding is not None for node in nodes):
+    if len(dense_embeddings) != len(nodes):
         raise ValueError("All nodes must have embeddings attached before upserting")
 
+    if sparse_embeddings.shape != (len(nodes), len(vocab)):
+        raise ValueError(
+            f"Sparse embeddings shape {sparse_embeddings.shape} does not match expected shape ({len(nodes)}, {len(vocab)})"
+        )
+
+    client = get_qdrant_client()
     ensure_collection_exists(
         collection_name=collection_name,
         dense_name=dense_name,
@@ -61,22 +72,49 @@ def upsert_nodes(
         vector_size=vector_size,
     )
 
-    client = get_qdrant_client()
-    out = client.upsert(
-        collection_name=collection_name,
-        points=[
+    # Convert each CSR row to Qdrant SparseVector
+    def sparse_vectorize(i: int) -> models.SparseVector:
+        start = sparse_embeddings.indptr[i]
+        end = sparse_embeddings.indptr[i + 1]
+        indices: List[int] = sparse_embeddings.indices[start:end].tolist()
+        values: List[float] = sparse_embeddings.data[start:end].tolist()
+
+        # Qdrant accepts empty sparse vectors, but keep explicit empty lists
+        return models.SparseVector(indices=indices, values=values)
+
+    points: list[models.PointStruct] = [
+        models.PointStruct(
+            id=0,
+            vector={
+                dense_name: [0.0] * vector_size,
+                sparse_name: models.SparseVector(indices=[], values=[]),
+            },
+            payload={
+                "vocab": vocab,
+            },
+        )
+    ]
+
+    for i, node in enumerate(nodes):
+        vector_map: dict[str, object] = {
+            dense_name: dense_embeddings[i],
+            sparse_name: sparse_vectorize(i),
+        }
+
+        points.append(
             models.PointStruct(
                 id=node.id_,
-                vector={
-                    dense_name: node.embedding,
-                },
+                vector=vector_map,
                 payload={
                     "text": node.text,
                     "metadata": node.metadata,
                 },
             )
-            for node in nodes
-        ],
+        )
+
+    out = client.upsert(
+        collection_name=collection_name,
+        points=points,
     )
 
     # Qdrant returns UpdateStatus.ACKNOWLEDGED or COMPLETED

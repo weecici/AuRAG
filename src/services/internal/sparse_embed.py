@@ -21,7 +21,7 @@ def lemmatize(words: list[str]) -> list[str]:
 
 def sparse_encode(
     texts: list[str],
-    word_process_method: Literal["lemmatize", "stem"],
+    word_process_method: Literal["lemmatize", "stem"] = "stem",
     bm25_method: str = "robertson",
     bm25_idf_method: Optional[str] = None,
     k1: float = 1.5,

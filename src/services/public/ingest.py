@@ -2,7 +2,7 @@ import inngest
 from fastapi import status
 from src import schemas
 from src.services.internal import process_documents, dense_encode, sparse_encode
-from src.repo.qdrant import upsert_nodes
+from src.repo.qdrant import upsert_data
 
 
 def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
@@ -40,20 +40,22 @@ def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
             f"Generated {len(nodes)} dense embeddings with each embedding's size is: {len(dense_embeddings[0])}"
         )
 
-        # Attach embeddings to nodes
-        for node, embedding in zip(nodes, dense_embeddings):
-            node.embedding = embedding
-
         # Create sparse embeddings for the nodes
         sparse_embeddings, vocab = sparse_encode(
             texts=[node.text for node in nodes],
             word_process_method="lemmatize",
         )
 
-        print(f"Generated sparse embeddings shape: {sparse_embeddings.shape}")
+        print(f"Generated sparse embeddings with shape: {sparse_embeddings.shape}")
 
         # Upsert nodes
-        upsert_nodes(nodes=nodes, collection_name=request.collection_name)
+        upsert_data(
+            nodes=nodes,
+            dense_embeddings=dense_embeddings,
+            sparse_embeddings=sparse_embeddings,
+            vocab=vocab,
+            collection_name=request.collection_name,
+        )
         ctx.logger.info(
             f"Upserted {len(nodes)} nodes from {len(request.file_paths)} documents to Qdrant collection '{request.collection_name}'."
         )
