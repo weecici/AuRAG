@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "bm25s>=0.2.14",
     "cerebras-cloud-sdk>=1.50.1",
     "fastapi>=0.119.0",
     "hf-transfer>=0.1.9",
@@ -12,8 +13,6 @@ dependencies = [
     "inngest>=0.5.9",
     "ir-datasets>=0.5.11",
     "llama-index>=0.14.5",
-    "llama-index-retrievers-bm25>=0.6.5",
-    "llama-index-vector-stores-qdrant>=0.8.6",
     "nbconvert>=7.16.6",
     "pydantic>=2.12.3",
     "python-dotenv>=1.1.1",
