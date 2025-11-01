@@ -8,7 +8,6 @@ from src.core import config
 @lru_cache(maxsize=1)
 def get_reranking_model() -> CrossEncoder:
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Loading embedding model '{config.RERANKING_MODEL}' on device: {device}")
     model = CrossEncoder(
         model_name_or_path=config.RERANKING_MODEL_PATH,
         device=device,

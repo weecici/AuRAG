@@ -1,8 +1,14 @@
 import inngest
 from fastapi import status
 from src import schemas
-from src.services.internal import process_documents, dense_encode, sparse_encode
+from src.services.internal import (
+    process_documents,
+    dense_encode,
+    sparse_encode,
+    build_inverted_index,
+)
 from src.repo.qdrant import upsert_data
+from src.repo.local import store_index
 
 
 def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
@@ -41,23 +47,46 @@ def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
         )
 
         # Create sparse embeddings for the nodes
-        sparse_embeddings, vocab = sparse_encode(
-            texts=[node.text for node in nodes],
-            word_process_method="lemmatize",
-        )
+        if request.sparse_process_method == "vectorize":
+            sparse_embeddings, vocab = sparse_encode(
+                texts=[node.text for node in nodes],
+            )
 
-        print(f"Generated sparse embeddings with shape: {sparse_embeddings.shape}")
+            ctx.logger.info(
+                f"Generated sparse embeddings with shape: {sparse_embeddings.shape}"
+            )
 
-        # Upsert nodes
-        upsert_data(
-            nodes=nodes,
-            dense_embeddings=dense_embeddings,
-            sparse_embeddings=sparse_embeddings,
-            vocab=vocab,
-            collection_name=request.collection_name,
-        )
+            upsert_data(
+                nodes=nodes,
+                dense_embeddings=dense_embeddings,
+                sparse_embeddings=sparse_embeddings,
+                vocab=vocab,
+                collection_name=request.collection_name,
+            )
+        else:
+            indexed_docs = build_inverted_index(
+                texts=[node.text for node in nodes],
+            )
+
+            ctx.logger.info(
+                f"Built inverted index with vocab size: {len(indexed_docs['vocab'])}"
+            )
+
+            store_index(
+                collection_name=request.collection_name,
+                indexed_docs=indexed_docs,
+            )
+
+            upsert_data(
+                nodes=nodes,
+                dense_embeddings=dense_embeddings,
+                sparse_embeddings=None,
+                vocab=None,
+                collection_name=request.collection_name,
+            )
+
         ctx.logger.info(
-            f"Upserted {len(nodes)} nodes from {len(request.file_paths)} documents to Qdrant collection '{request.collection_name}'."
+            f"Completed ingestion process of {len(nodes)} documents for collection '{request.collection_name}'."
         )
 
         return schemas.IngestionResponse(

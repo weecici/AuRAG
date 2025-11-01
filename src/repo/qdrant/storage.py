@@ -5,7 +5,7 @@ from qdrant_client import QdrantClient, models
 from llama_index.core.schema import BaseNode
 from src.core import config
 from scipy.sparse import csr_matrix
-from typing import List
+from typing import Optional
 
 
 @lru_cache(maxsize=1)
@@ -48,8 +48,8 @@ def ensure_collection_exists(
 def upsert_data(
     nodes: list[BaseNode],
     dense_embeddings: list[list[float]],
-    sparse_embeddings: csr_matrix,
-    vocab: dict[str, int],
+    sparse_embeddings: Optional[csr_matrix],
+    vocab: Optional[dict[str, int]],
     collection_name: str,
     dense_name: str = config.EMBEDDING_MODEL,
     sparse_name: str = config.SPARSE_MODEL,
@@ -61,7 +61,10 @@ def upsert_data(
     if len(dense_embeddings) != len(nodes):
         raise ValueError("All nodes must have embeddings attached before upserting")
 
-    if sparse_embeddings.shape != (len(nodes), len(vocab)):
+    if sparse_embeddings is not None and sparse_embeddings.shape != (
+        len(nodes),
+        len(vocab),
+    ):
         raise ValueError(
             f"Sparse embeddings shape {sparse_embeddings.shape} does not match expected shape ({len(nodes)}, {len(vocab)})"
         )
@@ -74,22 +77,23 @@ def upsert_data(
         vector_size=vector_size,
     )
 
-    # Convert each CSR row to Qdrant SparseVector
     def sparse_vectorize(i: int) -> models.SparseVector:
         start = sparse_embeddings.indptr[i]
         end = sparse_embeddings.indptr[i + 1]
-        indices: List[int] = sparse_embeddings.indices[start:end].tolist()
-        values: List[float] = sparse_embeddings.data[start:end].tolist()
+        indices: list[int] = sparse_embeddings.indices[start:end].tolist()
+        values: list[float] = sparse_embeddings.data[start:end].tolist()
 
-        # Qdrant accepts empty sparse vectors, but keep explicit empty lists
         return models.SparseVector(indices=indices, values=values)
 
-    # Build Qdrant PointStructs from nodes and their dense/sparse embeddings
     points: list[models.PointStruct] = []
     for i, node in enumerate(nodes):
         vector_map: dict[str, object] = {
             dense_name: dense_embeddings[i],
-            sparse_name: sparse_vectorize(i),
+            sparse_name: (
+                sparse_vectorize(i)
+                if sparse_embeddings is not None
+                else models.SparseVector(indices=[], values=[])
+            ),
         }
 
         points.append(
@@ -110,9 +114,12 @@ def upsert_data(
     )
 
     # Storing vocab on local disk for later use
-    vocab_path = os.path.join(config.DISK_STORAGE_PATH, f"{collection_name}_vocab.json")
-    with open(vocab_path, "w") as f:
-        json.dump(vocab, f)
+    if vocab is not None:
+        vocab_path = os.path.join(
+            config.DISK_STORAGE_PATH, f"{collection_name}_vocab.json"
+        )
+        with open(vocab_path, "w") as f:
+            json.dump(vocab, f)
 
     # Qdrant returns UpdateStatus.ACKNOWLEDGED or COMPLETED
     if out.status not in (

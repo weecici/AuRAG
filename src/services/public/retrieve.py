@@ -3,6 +3,7 @@ from fastapi import status
 from src import schemas
 from src.services.internal import dense_encode, rerank
 from src.repo.qdrant import dense_search, sparse_search, hybrid_search
+from src.repo.local import index_retrieve
 
 
 def retrieve_documents(ctx: inngest.Context) -> schemas.RetrievalResponse:
@@ -39,11 +40,18 @@ def retrieve_documents(ctx: inngest.Context) -> schemas.RetrievalResponse:
                 top_k=request.top_k,
             )
         elif request.mode == "sparse":
-            results = sparse_search(
-                query_texts=request.queries,
-                collection_name=request.collection_name,
-                top_k=request.top_k,
-            )
+            if request.sparse_process_method == "vectorize":
+                results = sparse_search(
+                    query_texts=request.queries,
+                    collection_name=request.collection_name,
+                    top_k=request.top_k,
+                )
+            else:
+                results = index_retrieve(
+                    query_texts=request.queries,
+                    collection_name=request.collection_name,
+                    top_k=request.top_k,
+                )
         elif request.mode == "hybrid":
             results = hybrid_search(
                 query_embeddings=query_embeddings,
@@ -63,10 +71,10 @@ def retrieve_documents(ctx: inngest.Context) -> schemas.RetrievalResponse:
         )
 
         # Rerank results
-        results = rerank(
-            queries=request.queries,
-            candidates=results,
-        )
+        # results = rerank(
+        #     queries=request.queries,
+        #     candidates=results,
+        # )
 
         return schemas.RetrievalResponse(
             status=status.HTTP_200_OK,
