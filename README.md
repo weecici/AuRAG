@@ -37,7 +37,8 @@ flowchart TD
     classDef source fill:#444b6e,stroke:#6bc2ff,color:#fff;
     classDef process fill:#3a506b,stroke:#6bc2ff,color:#fff;
     classDef output fill:#2d6a4f,stroke:#80ed99,color:#fff;
-    classDef storage fill:#6a040f,stroke:#ffba08,color:#fff;```
+    classDef storage fill:#6a040f,stroke:#ffba08,color:#fff;
+```
 
 ```mermaid
 %%{init: {
@@ -85,3 +86,13 @@ flowchart TD
     classDef output fill:#2d6a4f,stroke:#80ed99,color:#fff;
     classDef storage fill:#6a040f,stroke:#ffba08,color:#fff;
 ```
+
+## To-dos
+
+- [x] Dense Embedding Retrieval (vector)
+- [x] Sparse Embedding Retrieval (vector)
+- [x] Hybrid Retrieval (vector)
+- [x] Reranking with Cross-Encoder
+- [ ] Sparse Retrieval with Inverted Index (for presentation)
+- [ ] LLM Q&A
+- [ ] Dockerize the entire pipeline
