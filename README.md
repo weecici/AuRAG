@@ -93,6 +93,6 @@ flowchart TD
 - [x] Sparse Embedding Retrieval (vector)
 - [x] Hybrid Retrieval (vector)
 - [x] Reranking with Cross-Encoder
-- [ ] Sparse Retrieval with Inverted Index (for presentation)
+- [x] Sparse Retrieval with Inverted Index (for presentation)
 - [ ] LLM Q&A
 - [ ] Dockerize the entire pipeline
