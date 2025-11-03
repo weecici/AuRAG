@@ -41,9 +41,8 @@ def sparse_encode(
         final_embeddings.append((indices, values))
 
     # move to cpu to save gpu memory
-    if model.device.type != "cpu":
+    if model.device.type == "cuda":
         model = model.to(device="cpu")
-
-    torch.cuda.empty_cache()
+        torch.cuda.empty_cache()
 
     return final_embeddings

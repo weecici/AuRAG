@@ -37,3 +37,6 @@ class RetrievalQuery(BaseModel):
         default=2.0,
         description="Multiplier for overfetching in hybrid retrieval",
     )
+    rerank_enabled: bool = Field(
+        default=False, description="Whether to rerank retrieved results"
+    )

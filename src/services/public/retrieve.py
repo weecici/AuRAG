@@ -111,10 +111,9 @@ def retrieve_documents(ctx: inngest.Context) -> schemas.RetrievalResponse:
         )
 
         # Rerank results
-        results = rerank(
-            queries=request.queries,
-            candidates=results,
-        )
+        if request.rerank_enabled:
+            ctx.logger.info("Starting reranking of retrieved results.")
+            results = rerank(queries=request.queries, candidates=results)
 
         return schemas.RetrievalResponse(
             status=status.HTTP_200_OK,

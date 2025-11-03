@@ -56,8 +56,8 @@ def rerank(
         reranked_results.append(current_reranked)
 
     # move to cpu to save gpu memory
-    if model.device.type != "cpu":
+    if model.device.type == "cuda":
         model = model.to(device="cpu")
-    torch.cuda.empty_cache()
+        torch.cuda.empty_cache()
 
     return reranked_results
