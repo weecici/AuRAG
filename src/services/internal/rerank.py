@@ -4,11 +4,12 @@ from sentence_transformers import CrossEncoder
 from scipy.special import softmax
 from src import schemas
 from src.core import config
+from src.utils import logger
 
 
 @lru_cache(maxsize=1)
 def _get_reranking_model() -> CrossEncoder:
-    print(f"Loading reranking model: {config.RERANKING_MODEL}")
+    logger.info(f"Loading reranking model: {config.RERANKING_MODEL}")
     model = CrossEncoder(model_name_or_path=config.RERANKING_MODEL_PATH, device="cpu")
     return model
 

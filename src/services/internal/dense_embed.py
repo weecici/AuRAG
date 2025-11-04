@@ -3,11 +3,12 @@ from functools import lru_cache
 from typing import Literal
 from sentence_transformers import SentenceTransformer
 from src.core import config
+from src.utils import logger
 
 
 @lru_cache(maxsize=1)
 def _get_embedding_model() -> SentenceTransformer:
-    print(f"Loading dense embedding model: {config.DENSE_MODEL}")
+    logger.info(f"Loading dense embedding model: {config.DENSE_MODEL}")
     model = SentenceTransformer(
         model_name_or_path=config.DENSE_MODEL_PATH, device="cpu"
     )

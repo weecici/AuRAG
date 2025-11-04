@@ -3,11 +3,12 @@ from sentence_transformers import SparseEncoder
 from functools import lru_cache
 from typing import Literal
 from src.core import config
+from src.utils import logger
 
 
 @lru_cache(maxsize=1)
 def _get_embedding_model() -> SparseEncoder:
-    print(f"Loading sparse embedding model: {config.SPARSE_MODEL}")
+    logger.info(f"Loading sparse embedding model: {config.SPARSE_MODEL}")
     model = SparseEncoder(model_name_or_path=config.SPARSE_MODEL_PATH, device="cpu")
     return model
 

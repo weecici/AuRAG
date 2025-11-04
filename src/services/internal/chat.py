@@ -1,11 +1,12 @@
 from functools import lru_cache
 from cerebras.cloud.sdk import Cerebras
 from src.core import config
+from src.utils import logger
 
 
 @lru_cache(maxsize=1)
 def _get_llm_client() -> Cerebras:
-    print("Initializing Cerebras LLM client")
+    logger.info("Initializing Cerebras LLM client")
     client = Cerebras(api_key=config.CEREBRAS_API_KEY)
     return client
 
