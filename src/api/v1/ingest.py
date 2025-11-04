@@ -13,18 +13,15 @@ router = APIRouter()
     retries=0,
 )
 async def ingest_documents(ctx: inngest.Context) -> dict[str, any]:
-    return public_svcs.ingest_documents(ctx).model_dump()
+    request = schemas.IngestionRequest.model_validate(ctx.event.data)
+    return public_svcs.ingest_documents(request).model_dump()
 
 
 @router.post(
     "/ingest",
-    response_model=dict,
+    response_model=schemas.IngestionResponse,
     summary="Start document ingestion",
     description="Triggers an asynchronous job to ingest documents from the specified file paths or directory.",
 )
-async def ingest(request: schemas.IngestionRequest) -> dict[str, any]:
-    result = await inngest_client.send(
-        inngest.Event(name="rag/ingest-documents", data=request.model_dump())
-    )
-    print(result)
-    return {"message": "Ingestion process started"}
+async def ingest(request: schemas.IngestionRequest) -> schemas.IngestionResponse:
+    return public_svcs.ingest_documents(request)

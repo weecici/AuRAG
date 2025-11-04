@@ -1,6 +1,7 @@
 import inngest
 from fastapi import status
 from src import schemas
+from src.utils import logger
 from src.services.internal import (
     process_documents,
     dense_encode,
@@ -11,14 +12,13 @@ from src.repo.qdrant import upsert_data
 from src.repo.local import store_index
 
 
-def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
+def ingest_documents(request: schemas.IngestionRequest) -> schemas.IngestionResponse:
     try:
-        request = schemas.IngestionRequest.model_validate(ctx.event.data)
         if not request.file_paths and not request.file_dir:
             raise ValueError("No file paths or directory provided in event data.")
 
-        ctx.logger.info(
-            f"Starting documents ingestion process to the collection '{request.collection_name}'."
+        logger.info(
+            f"Starting documents ingestion process to the collection '{request.collection_name}'..."
         )
 
         nodes = process_documents(
@@ -28,7 +28,7 @@ def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
         if len(nodes) == 0:
             raise ValueError("No nodes were created from the provided documents.")
 
-        ctx.logger.info(f"Processed {len(nodes)} chunks with UUIDs and metadata.")
+        logger.info(f"Processed {len(nodes)} chunks with UUIDs and metadata.")
 
         # Create dense embeddings for the docs
         dense_embeddings = dense_encode(
@@ -37,7 +37,7 @@ def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
             text_type="document",
         )
 
-        ctx.logger.info(
+        logger.info(
             f"Generated {len(dense_embeddings)} dense embeddings with each embedding's size is: {len(dense_embeddings[0])}"
         )
 
@@ -48,7 +48,7 @@ def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
                 texts=[node.text for node in nodes],
             )
 
-            ctx.logger.info(f"Generated {len(sparse_embeddings)} sparse embeddings.")
+            logger.info(f"Generated {len(sparse_embeddings)} sparse embeddings.")
 
             upsert_data(
                 nodes=nodes,
@@ -64,7 +64,7 @@ def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
                 metadata=[node.metadata for node in nodes],
             )
 
-            ctx.logger.info(
+            logger.info(
                 f"Built inverted index with vocab size: {len(indexed_docs['vocab'])}"
             )
 
@@ -80,7 +80,7 @@ def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
                 collection_name=request.collection_name,
             )
 
-        ctx.logger.info(
+        logger.info(
             f"Completed ingestion process of {len(nodes)} documents for collection '{request.collection_name}'."
         )
 
@@ -90,7 +90,7 @@ def ingest_documents(ctx: inngest.Context) -> schemas.IngestionResponse:
         )
 
     except Exception as e:
-        ctx.logger.error(f"Error while ingesting documents: {e}")
+        logger.error(f"Error while ingesting documents: {e}")
 
         return schemas.IngestionResponse(
             status=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)

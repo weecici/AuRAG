@@ -13,18 +13,15 @@ router = APIRouter()
     retries=0,
 )
 async def retrieve_documents(ctx: inngest.Context) -> dict[str, any]:
-    return public_svcs.retrieve_documents(ctx).model_dump()
+    request = schemas.RetrievalRequest.model_validate(ctx.event.data)
+    return public_svcs.retrieve_documents(request).model_dump()
 
 
 @router.post(
     "/retrieve",
-    response_model=dict,
+    response_model=schemas.RetrievalResponse,
     summary="Retrieve relevant documents",
     description="Triggers an asynchronous job to retrieve documents based on the provided queries.",
 )
-async def retrieve(request: schemas.RetrievalRequest) -> dict[str, any]:
-    result = await inngest_client.send(
-        inngest.Event(name="rag/retrieve-documents", data=request.model_dump())
-    )
-    print(result)
-    return {"message": "Retrieval process started"}
+async def retrieve(request: schemas.RetrievalRequest) -> schemas.RetrievalResponse:
+    return public_svcs.retrieve_documents(request)

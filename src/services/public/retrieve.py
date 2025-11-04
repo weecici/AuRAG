@@ -1,21 +1,19 @@
-import inngest
 from fastapi import status
 from src import schemas
+from src.utils import logger
 from src.services.internal import dense_encode, sparse_encode, rerank
 from src.repo.qdrant import dense_search, sparse_search, hybrid_search
 from src.repo.local import index_retrieve
 from src.services.internal import fuse_results
 
 
-def retrieve_documents(ctx: inngest.Context) -> schemas.RetrievalResponse:
+def retrieve_documents(request: schemas.RetrievalRequest) -> schemas.RetrievalResponse:
     try:
-        request = schemas.RetrievalRequest.model_validate(ctx.event.data)
-
         if not request.queries:
             raise ValueError("No query text provided in event data.")
 
-        ctx.logger.info(
-            f"Starting document retrieval process for the {len(request.queries)} input queries."
+        logger.info(
+            f"Starting document retrieval process for the {len(request.queries)} input queries..."
         )
 
         # Generate dense embeddings for the queries
@@ -27,7 +25,7 @@ def retrieve_documents(ctx: inngest.Context) -> schemas.RetrievalResponse:
                 raise ValueError(
                     f"Query embeddings generation failed or returned incorrect count: {len(dense_query_embeddings)}"
                 )
-            ctx.logger.info(
+            logger.info(
                 f"Generated {len(dense_query_embeddings)} dense query embeddings with each embedding's length is: {len(dense_query_embeddings[0])}"
             )
 
@@ -43,12 +41,12 @@ def retrieve_documents(ctx: inngest.Context) -> schemas.RetrievalResponse:
                 raise ValueError(
                     f"Sparse query embeddings generation failed or returned incorrect count: {len(sparse_query_embeddings)}"
                 )
-            ctx.logger.info(
+            logger.info(
                 f"Generated {len(sparse_query_embeddings)} sparse query embeddings"
             )
 
         # Retrieve documents based on the specified mode
-        ctx.logger.info(
+        logger.info(
             f"Performing '{request.mode}' retrieval from collection '{request.collection_name}'."
         )
         if request.mode == "dense":
@@ -105,13 +103,13 @@ def retrieve_documents(ctx: inngest.Context) -> schemas.RetrievalResponse:
             raise ValueError(
                 f"Retrieval failed or returned incorrect number of results: {len(results)}"
             )
-        ctx.logger.info(
+        logger.info(
             f"Retrieved top {request.top_k} similar documents for each of the {len(request.queries)} queries from collection '{request.collection_name}'."
         )
 
         # Rerank results
         if request.rerank_enabled:
-            ctx.logger.info("Starting reranking of retrieved results.")
+            logger.info("Starting reranking of retrieved results.")
             results = rerank(queries=request.queries, candidates=results)
 
         return schemas.RetrievalResponse(
@@ -120,7 +118,7 @@ def retrieve_documents(ctx: inngest.Context) -> schemas.RetrievalResponse:
         )
 
     except Exception as e:
-        ctx.logger.error(f"Error in retrieve_documents: {e}")
+        logger.error(f"Error in retrieve_documents: {e}")
         return schemas.RetrievalResponse(
             status=status.HTTP_500_INTERNAL_SERVER_ERROR, results=[]
         )
