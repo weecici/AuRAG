@@ -1,1 +1,1 @@
-pnpx inngest-cli@latest dev -u http://localhost:8000/api/inngest --no-discovery
+pnpx inngest-cli@latest dev -u http://localhost:8000/api/inngest --no-discovery --no-poll
