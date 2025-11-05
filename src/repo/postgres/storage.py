@@ -8,16 +8,15 @@ from pgvector.psycopg import register_vector
 from llama_index.core.schema import BaseNode
 from src import schemas
 from src.core import config
-from src.utils import logger
 
 
 def _get_db_params() -> dict:
     return {
-        "host": os.getenv("POSTGRES_HOST", "localhost"),
-        "port": int(os.getenv("POSTGRES_PORT", "5432")),
-        "user": os.getenv("POSTGRES_USER", "postgres"),
-        "password": os.getenv("POSTGRES_PASSWORD", "pg"),
-        "dbname": os.getenv("POSTGRES_DB", "cs419_db"),
+        "host": config.POSTGRES_HOST,
+        "port": config.POSTGRES_PORT,
+        "user": config.POSTGRES_USER,
+        "password": config.POSTGRES_PASSWORD,
+        "dbname": config.POSTGRES_DB,
     }
 
 

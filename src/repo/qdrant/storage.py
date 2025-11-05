@@ -8,7 +8,7 @@ from src.core import config
 
 @lru_cache(maxsize=1)
 def get_qdrant_client() -> QdrantClient:
-    return QdrantClient(url=config.QDRANT_URL, timeout=30)
+    return QdrantClient(host=config.QDRANT_HOST, port=config.QDRANT_PORT, timeout=30)
 
 
 def ensure_collection_exists(
