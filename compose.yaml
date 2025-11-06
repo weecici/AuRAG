@@ -1,5 +1,5 @@
 services:
-  db-pg:
+  db:
     image: pgvector/pgvector:pg18
     ports:
       - "${POSTGRES_PORT:-5432}:5432"

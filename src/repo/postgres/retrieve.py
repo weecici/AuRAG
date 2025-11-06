@@ -1,5 +1,7 @@
 import psycopg
 from typing import Optional, Literal
+from collections import Counter, defaultdict
+import heapq
 from psycopg import sql
 from pgvector import Vector, SparseVector
 from pgvector.psycopg import register_vector
@@ -177,17 +179,18 @@ def index_search(
     query_texts: list[str],
     collection_name: str,
     top_k: int = 5,
-    method: Literal["tfidf", "okapi-bm25"] = "okapi-bm25",
+    word_process_method: str = config.WORD_PROCESS_METHOD,
+    scoring_method: Literal["tfidf", "okapi-bm25"] = "okapi-bm25",
 ) -> list[list[schemas.RetrievedDocument]]:
     conn = get_pg_conn()
     ensure_collection_exists(collection_name=collection_name)
 
     results_all: list[list[schemas.RetrievedDocument]] = []
 
-    # Precompute corpus stats: N and avg_dl
+    # Precompute corpus stats once
     with conn.cursor() as cur:
         cur.execute(
-            sql.SQL("SELECT COUNT(*)::int, AVG(doc_len) FROM {};").format(
+            sql.SQL("SELECT COUNT(*)::int, AVG(doc_len) FROM {}; ").format(
                 sql.Identifier(collection_name)
             )
         )
@@ -195,135 +198,108 @@ def index_search(
         N = int(row[0]) if row and row[0] is not None else 0
         avg_dl = float(row[1]) if row and row[1] is not None else 0.0
 
-    if N == 0:
-        return [[] for _ in query_texts]
+        if N == 0:
+            return [[] for _ in query_texts]
 
-    # Process each query independently
-    for query_text in query_texts:
-        tokens: list[str] = tokenize([query_text], return_ids=False)[0]
-        if not tokens:
-            results_all.append([])
-            continue
-
-        uniq_terms = sorted(set(tokens))
-
-        # Fetch document frequencies for query terms
-        df_map: dict[str, int] = {}
         pl_table = f"{collection_name}_{POSTINGS_LIST_TABLE_SUFFIX}"
         df_table = f"{collection_name}_{DOC_FREQ_TABLE_SUFFIX}"
 
-        # Build placeholders for IN clause
-        placeholders = sql.SQL(", ").join([sql.Placeholder()] * len(uniq_terms))
+        tokenized_texts = tokenize(
+            texts=query_texts, word_process_method=word_process_method, return_ids=False
+        )
 
-        with conn.cursor() as cur:
-            # df per term
-            df_query = sql.SQL(
-                "SELECT term, doc_freq FROM {} WHERE term IN ({});"
-            ).format(sql.Identifier(df_table), placeholders)
-            cur.execute(df_query, uniq_terms)
-            for term, doc_freq in cur.fetchall() or []:
-                df_map[term] = int(doc_freq)
+        pl_select = sql.SQL("SELECT doc_id, freq FROM {} WHERE term = %s;").format(
+            sql.Identifier(pl_table)
+        )
+        df_select = sql.SQL("SELECT doc_freq FROM {} WHERE term = %s;").format(
+            sql.Identifier(df_table)
+        )
+        doc_select = sql.SQL(
+            """
+            SELECT id, text, document_id, title, file_name, file_path, doc_len
+            FROM {}
+            WHERE id = %s;
+            """
+        ).format(sql.Identifier(collection_name))
 
-        if not df_map:
-            results_all.append([])
-            continue
+        # Simple caches to avoid redundant queries within the same request batch
+        df_cache: dict[str, int] = {}
+        dl_cache: dict[str, int] = {}
 
-        # Compute IDF per term using provided util
-        idf_map: dict[str, float] = {t: calc_idf(df_map[t], N) for t in df_map}
+        for q_idx, tokens in enumerate(tokenized_texts):
+            term_counts = Counter(tokens)
+            # doc_id -> RetrievedDocument
+            doc_scores: dict[str, schemas.RetrievedDocument] = {}
 
-        # Fetch postings joined with doc_len for those terms
-        doc_scores: dict[object, float] = {}
-        doc_lens: dict[object, int] = {}
-
-        with conn.cursor() as cur:
-            postings_query = sql.SQL(
-                """
-                SELECT p.term, p.doc_id, p.freq, m.doc_len
-                FROM {pl} p
-                JOIN {main} m ON m.id = p.doc_id
-                WHERE p.term IN ({terms})
-                """
-            ).format(
-                pl=sql.Identifier(pl_table),
-                main=sql.Identifier(collection_name),
-                terms=placeholders,
-            )
-            cur.execute(postings_query, uniq_terms)
-            rows = cur.fetchall() or []
-
-        # Aggregate scores per document
-        if method == "tfidf":
-            for term, doc_id, tf_doc, dl in rows:
-                idf = idf_map.get(term)
-                if idf is None:
+            for term, query_tf in term_counts.items():
+                cur.execute(pl_select, (term,))
+                postings = cur.fetchall()  # rows of (doc_id, freq)
+                if not postings:
                     continue
-                score = calc_tfidf(int(tf_doc), float(idf))
-                doc_scores[doc_id] = doc_scores.get(doc_id, 0.0) + score
-                if doc_id not in doc_lens:
-                    doc_lens[doc_id] = int(dl)
-        elif method == "okapi-bm25":  # okapi-bm25
-            for term, doc_id, tf_doc, dl in rows:
-                idf = idf_map.get(term)
-                if idf is None:
-                    continue
-                score = calc_okapi_bm25(
-                    tf=int(tf_doc), idf=float(idf), dl=int(dl), avg_dl=float(avg_dl)
-                )
-                doc_scores[doc_id] = doc_scores.get(doc_id, 0.0) + score
-                if doc_id not in doc_lens:
-                    doc_lens[doc_id] = int(dl)
-        else:
-            raise ValueError(f"Unsupported scoring method: {method}")
 
-        if not doc_scores:
-            results_all.append([])
-            continue
+                # fetch doc_freq (idf needs this)
+                if term in df_cache:
+                    df = df_cache[term]
+                else:
+                    cur.execute(df_select, (term,))
+                    df_row = cur.fetchone()
+                    df = int(df_row[0]) if df_row and df_row[0] is not None else 0
+                    df_cache[term] = df
 
-        # Select top_k docs by score
-        top_docs = sorted(doc_scores.items(), key=lambda kv: kv[1], reverse=True)[
-            :top_k
-        ]
-        top_ids = [doc_id for doc_id, _ in top_docs]
+                for doc_id, tf in postings:
+                    sid = str(doc_id)
 
-        # Fetch payloads for top docs
-        placeholders_ids = sql.SQL(", ").join([sql.Placeholder()] * len(top_ids))
-        with conn.cursor() as cur:
-            payload_query = sql.SQL(
-                """
-                SELECT id, text, document_id, title, file_name, file_path
-                FROM {main}
-                WHERE id IN ({ids})
-                """
-            ).format(main=sql.Identifier(collection_name), ids=placeholders_ids)
-            cur.execute(payload_query, top_ids)
-            payload_rows = cur.fetchall() or []
+                    # fetch payload + doc_len
+                    if sid in dl_cache:
+                        dl = dl_cache[sid]
+                    else:
+                        cur.execute(doc_select, (doc_id,))
+                        drow = cur.fetchone()
+                        if not drow:
+                            continue
+                        (
+                            _,
+                            text,
+                            document_id,
+                            title,
+                            file_name,
+                            file_path,
+                            dl,
+                        ) = drow
 
-        payload_map = {
-            row[0]: (row[1], row[2], row[3], row[4], row[5]) for row in payload_rows
-        }
+                        payload = schemas.DocumentPayload(
+                            text=text,
+                            metadata=schemas.DocumentMetadata(
+                                document_id=document_id or "",
+                                title=title or "",
+                                file_name=file_name or "",
+                                file_path=file_path or "",
+                            ),
+                        )
 
-        # Build results in the correct order
-        query_results: list[schemas.RetrievedDocument] = []
-        for doc_id, score in top_docs:
-            text, document_id, title, file_name, file_path = payload_map.get(
-                doc_id, ("", "", "", "", "")
-            )
-            payload = schemas.DocumentPayload(
-                text=text,
-                metadata=schemas.DocumentMetadata(
-                    document_id=document_id or "",
-                    title=title or "",
-                    file_name=file_name or "",
-                    file_path=file_path or "",
-                ),
-            )
-            query_results.append(
-                schemas.RetrievedDocument(
-                    id=str(doc_id), score=float(score), payload=payload
-                )
-            )
+                        dl_cache[sid] = int(dl) if dl is not None else 0
+                        doc_scores[sid] = schemas.RetrievedDocument(
+                            id=sid,
+                            score=0.0,
+                            payload=payload,
+                        )
 
-        results_all.append(query_results)
+                    idf = calc_idf(N=N, df=df)
+                    if scoring_method == "tfidf":
+                        doc_scores[sid].score += query_tf * calc_tfidf(tf=tf, idf=idf)
+                    elif scoring_method == "okapi-bm25":
+                        doc_scores[sid].score += query_tf * calc_okapi_bm25(
+                            tf=tf, idf=idf, dl=dl, avg_dl=avg_dl
+                        )
+                    else:
+                        raise ValueError(
+                            f"Unsupported scoring_method: {scoring_method}"
+                        )
+
+            retrieved_docs = list(doc_scores.values())
+            retrieved_docs.sort(key=lambda x: x.score, reverse=True)
+
+            results_all.append(retrieved_docs)
 
     return results_all
 
@@ -370,7 +346,6 @@ def ii_hybrid_search(
     overfetch_mul: float = 2.0,
     fusion_method: Literal["dbsf", "rrf"] = config.FUSION_METHOD,
     dense_name: str = config.DENSE_MODEL,
-    sparse_name: str = config.SPARSE_MODEL,
 ) -> list[list[schemas.RetrievedDocument]]:
     # Overfetch separately then fuse client-side
     overfetch_amount = max(top_k, int(top_k * overfetch_mul))

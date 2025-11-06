@@ -48,6 +48,9 @@ def ensure_collection_exists(
 ) -> None:
     conn = get_pg_conn()
 
+    df_table = f"{collection_name}_{DOC_FREQ_TABLE_SUFFIX}"
+    pl_table = f"{collection_name}_{POSTINGS_LIST_TABLE_SUFFIX}"
+
     create_main_table = sql.SQL(
         """
 		CREATE TABLE IF NOT EXISTS {main_table} (
@@ -66,8 +69,8 @@ def ensure_collection_exists(
         main_table=sql.Identifier(collection_name),
         dense_col=sql.Identifier(dense_name),
         sparse_col=sql.Identifier(sparse_name),
-        dense_dim=sql.Literal(int(dense_dim)),
-        sparse_dim=sql.Literal(int(sparse_dim)),
+        dense_dim=sql.Literal(dense_dim),
+        sparse_dim=sql.Literal(sparse_dim),
     )
 
     create_emb_index = sql.SQL(
@@ -97,6 +100,17 @@ def ensure_collection_exists(
         ef_construction=sql.Literal(ef_construction),
     )
 
+    create_doc_freq_table = sql.SQL(
+        """
+        CREATE TABLE IF NOT EXISTS {df_table} (
+            term TEXT PRIMARY KEY,
+            doc_freq INT NOT NULL
+        );
+        """
+    ).format(
+        df_table=sql.Identifier(df_table),
+    )
+
     create_postings_list_table = sql.SQL(
         """
         CREATE TABLE IF NOT EXISTS {pl_table} (
@@ -104,11 +118,13 @@ def ensure_collection_exists(
             doc_id UUID,
             freq INT NOT NULL,
             PRIMARY KEY (term, doc_id),
+            FOREIGN KEY (term) REFERENCES {df_table}(term) ON DELETE CASCADE,
             FOREIGN KEY (doc_id) REFERENCES {main_table}(id) ON DELETE CASCADE
         );
         """
     ).format(
-        pl_table=sql.Identifier(f"{collection_name}_{POSTINGS_LIST_TABLE_SUFFIX}"),
+        pl_table=sql.Identifier(pl_table),
+        df_table=sql.Identifier(df_table),
         main_table=sql.Identifier(collection_name),
     )
 
@@ -120,27 +136,16 @@ def ensure_collection_exists(
         term_index=sql.Identifier(
             f"{collection_name}_{POSTINGS_LIST_TABLE_SUFFIX}_term_idx"
         ),
-        pl_table=sql.Identifier(f"{collection_name}_{POSTINGS_LIST_TABLE_SUFFIX}"),
-    )
-
-    create_doc_freq_table = sql.SQL(
-        """
-        CREATE TABLE IF NOT EXISTS {df_table} (
-            term TEXT PRIMARY KEY,
-            doc_freq INT NOT NULL
-        );
-        """
-    ).format(
-        df_table=sql.Identifier(f"{collection_name}_{DOC_FREQ_TABLE_SUFFIX}"),
+        pl_table=sql.Identifier(pl_table),
     )
 
     with conn.cursor() as cur:
         cur.execute(create_main_table)
         cur.execute(create_dense_index)
         cur.execute(create_sparse_index)
+        cur.execute(create_doc_freq_table)
         cur.execute(create_postings_list_table)
         cur.execute(create_term_index)
-        cur.execute(create_doc_freq_table)
 
 
 def _to_sparsevec(indices: list[int], values: list[float]) -> SparseVector:
@@ -202,17 +207,6 @@ def upsert_data(
         sparse_col=sql.Identifier(sparse_name),
     )
 
-    insert_pl_table = sql.SQL(
-        """
-        INSERT INTO {pl_table} (term, doc_id, freq)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (term, doc_id) DO UPDATE SET
-            freq = EXCLUDED.freq;
-        """
-    ).format(
-        pl_table=sql.Identifier(f"{collection_name}_{POSTINGS_LIST_TABLE_SUFFIX}"),
-    )
-
     insert_df_table = sql.SQL(
         """
         INSERT INTO {df_table} (term, doc_freq)
@@ -224,9 +218,20 @@ def upsert_data(
         df_table=sql.Identifier(f"{collection_name}_{DOC_FREQ_TABLE_SUFFIX}"),
     )
 
+    insert_pl_table = sql.SQL(
+        """
+        INSERT INTO {pl_table} (term, doc_id, freq)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (term, doc_id) DO UPDATE SET
+            freq = EXCLUDED.freq;
+        """
+    ).format(
+        pl_table=sql.Identifier(f"{collection_name}_{POSTINGS_LIST_TABLE_SUFFIX}"),
+    )
+
     main_rows = []
-    pl_rows = []
     df_rows = []
+    pl_rows = []
 
     # prepare main table rows
     for i, node in enumerate(nodes):
@@ -260,6 +265,12 @@ def upsert_data(
 
     # prepare postings list and document frequency rows
     for term, term_entry in postings_list.items():
+        df_rows.append(
+            (
+                term,
+                term_entry.doc_freq,
+            )
+        )
         for posting in term_entry.postings:
             pl_rows.append(
                 (
@@ -268,14 +279,8 @@ def upsert_data(
                     posting.term_freq,
                 )
             )
-        df_rows.append(
-            (
-                term,
-                term_entry.doc_freq,
-            )
-        )
 
     with conn.cursor() as cur:
         cur.executemany(insert_main_table, main_rows)
-        cur.executemany(insert_pl_table, pl_rows)
         cur.executemany(insert_df_table, df_rows)
+        cur.executemany(insert_pl_table, pl_rows)

@@ -20,8 +20,8 @@ def build_inverted_index(
 
     # creating postings list
     for doc_id, tokens in zip(doc_ids, tokenized_docs):
-        counts = Counter(tokens)
-        for token, term_freq in counts.items():
+        term_counts = Counter(tokens)
+        for token, term_freq in term_counts.items():
             doc_lens[doc_id] = doc_lens.get(doc_id, 0) + term_freq
             if token not in postings_list:
                 postings_list[token] = schemas.TermEntry(doc_freq=0, postings=[])
