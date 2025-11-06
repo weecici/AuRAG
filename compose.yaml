@@ -5,10 +5,19 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pg}
-      POSTGRES_DB: ${POSTGRES_DB:-cs419_db}
-    
+    env_file:
+      - .env
+
+  # backend:
+  #   build: .
+  #   depends_on:
+  #     - db
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     POSTGRES_HOST: db
+  #   ports:
+  #     - "${BACKEND_PORT:-8000}:8000"
+
 volumes:
   pg_data:

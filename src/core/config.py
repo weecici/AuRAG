@@ -36,10 +36,3 @@ POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
 POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "pg")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "cs419_db")
-
-# qdrant
-QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
-QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
-
-# disk storage
-DISK_STORAGE_PATH = os.getenv("DISK_STORAGE_PATH", "./.storage")
