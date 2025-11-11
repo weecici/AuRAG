@@ -1,12 +1,12 @@
 from typing import Optional, Literal
 from collections import Counter
 from psycopg import sql
-from pgvector import Vector, SparseVector
+from pgvector import Vector
 from src import schemas
 from src.core import config
 from src.services.internal import fuse_results
 from src.utils import *
-from .storage import (
+from ._storage import (
     get_pg_conn,
     ensure_collection_exists,
     POSTINGS_LIST_TABLE_SUFFIX,
@@ -108,75 +108,9 @@ def dense_search(
 
 
 def sparse_search(
-    query_embeddings: list[tuple[list[int], list[float]]],
-    collection_name: str,
-    top_k: int = 5,
-    sparse_name: str = config.SPARSE_MODEL,
-) -> list[list[schemas.RetrievedDocument]]:
-    conn = get_pg_conn()
-    ensure_collection_exists(collection_name=collection_name, sparse_name=sparse_name)
-
-    logger.info(
-        f"pgvector.sparse_search collection={collection_name} top_k={top_k} using={sparse_name} dim={config.SPARSE_DIM} op=<#> (inner product)"
-    )
-
-    query_tmpl = sql.SQL(
-        """
-		SELECT id,
-               {sparse_col} <#> %s AS score,
-			   text,
-			   document_id,
-			   title,
-			   file_name,
-			   file_path
-		FROM {table}
-        ORDER BY {sparse_col} <#> %s
-		LIMIT %s;
-		"""
-    ).format(
-        table=sql.Identifier(collection_name),
-        sparse_col=sql.Identifier(sparse_name),
-    )
-
-    all_results: list[list[schemas.RetrievedDocument]] = []
-    with conn.cursor() as cur:
-        for indices, values in query_embeddings:
-            if len(indices) == 0:
-                all_results.append([])
-                continue
-            vec = SparseVector(
-                {int(i): float(v) for i, v in zip(indices, values)}, config.SPARSE_DIM
-            )
-            cur.execute(query_tmpl, (vec, vec, top_k))
-            rows = cur.fetchall()
-
-            if not rows:
-                logger.debug("pgvector.sparse_search: 0 candidates")
-            else:
-                preview = min(5, len(rows))
-                for i in range(preview):
-                    rid, neg_ip, *_ = rows[i]
-                    try:
-                        nip = float(neg_ip)
-                    except Exception:
-                        nip = 0.0
-                    logger.debug(
-                        f"sparse cand[{i}] id={rid} neg_ip={nip:.6f} ip={-nip:.6f}"
-                    )
-
-            # convert to positive similarity = -value (sum of weights)
-            all_results.append(
-                _rows_to_results(rows, distance_to_similarity=lambda v: -v)
-            )
-
-    return all_results
-
-
-def index_search(
     query_texts: list[str],
     collection_name: str,
     top_k: int = 5,
-    word_process_method: str = config.WORD_PROCESS_METHOD,
     scoring_method: Literal["tfidf", "okapi-bm25"] = "okapi-bm25",
 ) -> list[list[schemas.RetrievedDocument]]:
     conn = get_pg_conn()
@@ -201,9 +135,7 @@ def index_search(
         pl_table = f"{collection_name}_{POSTINGS_LIST_TABLE_SUFFIX}"
         df_table = f"{collection_name}_{DOC_FREQ_TABLE_SUFFIX}"
 
-        tokenized_texts = tokenize(
-            texts=query_texts, word_process_method=word_process_method, return_ids=False
-        )
+        tokenized_texts = tokenize(texts=query_texts)
 
         pl_select = sql.SQL("SELECT doc_id, freq FROM {} WHERE term = %s;").format(
             sql.Identifier(pl_table)
@@ -296,46 +228,12 @@ def index_search(
             retrieved_docs = list(doc_scores.values())
             retrieved_docs.sort(key=lambda x: x.score, reverse=True)
 
-            results_all.append(retrieved_docs)
+            results_all.append(retrieved_docs[:top_k])
 
     return results_all
 
 
 def hybrid_search(
-    dense_query_embeddings: list[list[float]],
-    sparse_query_embeddings: list[tuple[list[int], list[float]]],
-    collection_name: str,
-    top_k: int = 5,
-    overfetch_mul: float = 2.0,
-    fusion_method: Literal["dbsf", "rrf"] = config.FUSION_METHOD,
-    dense_name: str = config.DENSE_MODEL,
-    sparse_name: str = config.SPARSE_MODEL,
-) -> list[list[schemas.RetrievedDocument]]:
-    # Overfetch separately then fuse client-side
-    overfetch_amount = max(top_k, int(top_k * overfetch_mul))
-
-    dense_results = dense_search(
-        query_embeddings=dense_query_embeddings,
-        collection_name=collection_name,
-        top_k=overfetch_amount,
-        dense_name=dense_name,
-    )
-    sparse_results = sparse_search(
-        query_embeddings=sparse_query_embeddings,
-        collection_name=collection_name,
-        top_k=overfetch_amount,
-        sparse_name=sparse_name,
-    )
-
-    fused_results: list[list[schemas.RetrievedDocument]] = []
-    for d_res, s_res in zip(dense_results, sparse_results):
-        fused = fuse_results(results1=d_res, results2=s_res, method=fusion_method)
-        fused_results.append(fused[:top_k])
-
-    return fused_results
-
-
-def ii_hybrid_search(
     dense_query_embeddings: list[list[float]],
     query_texts: list[str],
     collection_name: str,
@@ -353,7 +251,7 @@ def ii_hybrid_search(
         top_k=overfetch_amount,
         dense_name=dense_name,
     )
-    sparse_results = index_search(
+    sparse_results = sparse_search(
         query_texts=query_texts,
         collection_name=collection_name,
         top_k=overfetch_amount,

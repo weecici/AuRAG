@@ -1,22 +1,18 @@
 from collections import Counter
 from src import schemas
-from src.core import config
 from src.utils import tokenize
 
 
 def build_inverted_index(
     texts: list[str],
     doc_ids: list[str],
-    word_process_method: str = config.WORD_PROCESS_METHOD,
 ) -> tuple[dict[str, schemas.TermEntry], dict[str, int]]:
     """Returns postings list and document lengths for the given texts."""
 
     postings_list: dict[str, schemas.TermEntry] = {}
     doc_lens: dict[str, int] = {}
 
-    tokenized_docs = tokenize(
-        texts=texts, word_process_method=word_process_method, return_ids=False
-    )
+    tokenized_docs = tokenize(texts=texts)
 
     # creating postings list
     for doc_id, tokens in zip(doc_ids, tokenized_docs):

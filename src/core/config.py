@@ -11,13 +11,8 @@ CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", None)
 
 # dense model
 DENSE_MODEL = os.getenv("DENSE_MODEL", "embeddinggemma-300m")
-DENSE_MODEL_PATH = os.getenv("EMBEDDING_MODEL_PATH", "google/embeddinggemma-300m")
+DENSE_MODEL_PATH = os.getenv("DENSE_MODEL_PATH", "google/embeddinggemma-300m")
 DENSE_DIM = int(os.getenv("DENSE_DIM", 768))
-
-# sparse model
-SPARSE_MODEL = os.getenv("SPARSE_MODEL", "splade-v3")
-SPARSE_MODEL_PATH = os.getenv("SPARSE_MODEL_PATH", "naver/splade-v3")
-SPARSE_DIM = int(os.getenv("SPARSE_DIM", "131072"))
 
 # reranking model
 RERANKING_MODEL = os.getenv("RERANKING_MODEL", "bge-reranker-v2-m3")

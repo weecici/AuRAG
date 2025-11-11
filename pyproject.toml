@@ -1,26 +1,23 @@
 [project]
-name = "cs419-rag"
+name = "cs431-rag"
 version = "0.1.0"
-description = "Add your description here"
+description = "CS431 RAG"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "bm25s>=0.2.14",
     "cerebras-cloud-sdk>=1.50.1",
     "fastapi>=0.119.0",
     "huggingface-hub[cli,hf-transfer]>=0.35.3",
     "inngest>=0.5.9",
-    "ir-datasets>=0.5.11",
     "llama-index>=0.14.5",
-    "nbconvert>=7.16.6",
-    "nltk>=3.9.2",
     "psycopg[binary]>=3.2.12",
     "pgvector>=0.4.1",
     "pydantic>=2.12.3",
     "python-dotenv>=1.1.1",
-    "qdrant-client>=1.15.1",
     "sentence-transformers>=5.1.2",
     "torch>=2.9.0",
     "transformers>=4.57.1",
     "uvicorn>=0.38.0",
+    "underthesea>=8.3.0",
+    "sentencepiece>=0.2.1",
 ]

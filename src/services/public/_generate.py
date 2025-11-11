@@ -2,7 +2,7 @@ from fastapi import status
 from src import schemas
 from src.services.internal import augment_prompts, generate
 from src.utils import logger
-from .retrieve import retrieve_documents
+from ._retrieve import retrieve_documents
 
 
 def generate_responses(

@@ -4,7 +4,6 @@ from src.utils import logger
 from src.services.internal import (
     process_documents,
     dense_encode,
-    sparse_encode,
     build_inverted_index,
 )
 from src.repo.postgres import upsert_data
@@ -39,14 +38,6 @@ def ingest_documents(request: schemas.IngestionRequest) -> schemas.IngestionResp
             f"Generated {len(dense_embeddings)} dense embeddings with each embedding's size is: {len(dense_embeddings[0])}"
         )
 
-        # Create sparse embeddings for the docs
-        sparse_embeddings = sparse_encode(
-            text_type="document",
-            texts=[node.text for node in nodes],
-        )
-
-        logger.info(f"Generated {len(sparse_embeddings)} sparse embeddings.")
-
         # Build inverted index (postings list) for the docs
         postings_list, doc_lens = build_inverted_index(
             texts=[node.text for node in nodes],
@@ -59,7 +50,6 @@ def ingest_documents(request: schemas.IngestionRequest) -> schemas.IngestionResp
         upsert_data(
             nodes=nodes,
             dense_embeddings=dense_embeddings,
-            sparse_embeddings=sparse_embeddings,
             postings_list=postings_list,
             doc_lens=doc_lens,
             collection_name=request.collection_name,

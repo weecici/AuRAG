@@ -1,9 +1,8 @@
 import psycopg
 from uuid import UUID
 from functools import lru_cache
-from typing import Optional
 from psycopg import sql
-from pgvector import Vector, SparseVector
+from pgvector import Vector
 from pgvector.psycopg import register_vector
 from llama_index.core.schema import BaseNode
 from src import schemas
@@ -39,9 +38,7 @@ def get_pg_conn() -> psycopg.Connection:
 def ensure_collection_exists(
     collection_name: str,
     dense_name: str = config.DENSE_MODEL,
-    sparse_name: str = config.SPARSE_MODEL,
     dense_dim: int = config.DENSE_DIM,
-    sparse_dim: int = config.SPARSE_DIM,
     m: int = 32,
     ef_construction: int = 128,
 ) -> None:
@@ -60,16 +57,13 @@ def ensure_collection_exists(
 			file_name TEXT,
 			file_path TEXT,
 			{dense_col} vector({dense_dim}) NOT NULL,
-			{sparse_col} sparsevec({sparse_dim}) NOT NULL,
             doc_len INT NOT NULL
 		);
 		"""
     ).format(
         main_table=sql.Identifier(collection_name),
         dense_col=sql.Identifier(dense_name),
-        sparse_col=sql.Identifier(sparse_name),
         dense_dim=sql.Literal(dense_dim),
-        sparse_dim=sql.Literal(sparse_dim),
     )
 
     create_emb_index = sql.SQL(
@@ -85,16 +79,6 @@ def ensure_collection_exists(
         table=sql.Identifier(collection_name),
         col=sql.Identifier(dense_name),
         ops=sql.SQL("vector_cosine_ops"),
-        m=sql.Literal(m),
-        ef_construction=sql.Literal(ef_construction),
-    )
-
-    create_sparse_index = create_emb_index.format(
-        idx_name=sql.Literal(f"{collection_name}_{sparse_name}_idx"),
-        index=sql.Identifier(f"{collection_name}_{sparse_name}_idx"),
-        table=sql.Identifier(collection_name),
-        col=sql.Identifier(sparse_name),
-        ops=sql.SQL("sparsevec_ip_ops"),
         m=sql.Literal(m),
         ef_construction=sql.Literal(ef_construction),
     )
@@ -141,29 +125,19 @@ def ensure_collection_exists(
     with conn.cursor() as cur:
         cur.execute(create_main_table)
         cur.execute(create_dense_index)
-        cur.execute(create_sparse_index)
         cur.execute(create_doc_freq_table)
         cur.execute(create_postings_list_table)
         cur.execute(create_term_index)
 
 
-def _to_sparsevec(indices: list[int], values: list[float]) -> SparseVector:
-    # Convert indices/values to dict form required by SparseVector with dimension
-    elem = {int(i): float(v) for i, v in zip(indices, values)}
-    return SparseVector(elem, config.SPARSE_DIM)
-
-
 def upsert_data(
     nodes: list[BaseNode],
     dense_embeddings: list[list[float]],
-    sparse_embeddings: Optional[list[tuple[list[int], list[float]]]],
     postings_list: dict[str, schemas.TermEntry],
     doc_lens: dict[str, int],
     collection_name: str,
     dense_name: str = config.DENSE_MODEL,
-    sparse_name: str = config.SPARSE_MODEL,
     dense_dim: int = config.DENSE_DIM,
-    sparse_dim: int = config.SPARSE_DIM,
 ) -> None:
     if not nodes:
         raise ValueError("No nodes provided for upserting")
@@ -173,37 +147,28 @@ def upsert_data(
             f"The number of dense embeddings ({len(dense_embeddings)}) must match the number of nodes ({len(nodes)})"
         )
 
-    if sparse_embeddings is not None and len(sparse_embeddings) != len(nodes):
-        raise ValueError(
-            f"The number of sparse embeddings ({len(sparse_embeddings)}) must match the number of nodes ({len(nodes)})"
-        )
-
     conn = get_pg_conn()
     ensure_collection_exists(
         collection_name=collection_name,
         dense_name=dense_name,
-        sparse_name=sparse_name,
         dense_dim=dense_dim,
-        sparse_dim=sparse_dim,
     )
 
     insert_main_table = sql.SQL(
         """
-		INSERT INTO {table} (id, text, document_id, title, file_name, file_path, {dense_col}, {sparse_col}, doc_len)
-		VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+		INSERT INTO {table} (id, text, document_id, title, file_name, file_path, {dense_col}, doc_len)
+		VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 		ON CONFLICT (id) DO UPDATE SET
 			text = EXCLUDED.text,
 			document_id = EXCLUDED.document_id,
 			title = EXCLUDED.title,
 			file_name = EXCLUDED.file_name,
 			file_path = EXCLUDED.file_path,
-			{dense_col} = EXCLUDED.{dense_col},
-			{sparse_col} = EXCLUDED.{sparse_col};
+			{dense_col} = EXCLUDED.{dense_col};
 		"""
     ).format(
         table=sql.Identifier(collection_name),
         dense_col=sql.Identifier(dense_name),
-        sparse_col=sql.Identifier(sparse_name),
     )
 
     insert_df_table = sql.SQL(
@@ -240,12 +205,6 @@ def upsert_data(
         )
 
         dense_vec = Vector(dense_embeddings[i])
-        sparse_vec = None
-        if sparse_embeddings is not None:
-            idxs, vals = sparse_embeddings[i]
-            if len(idxs) > 0:
-                sparse_vec = _to_sparsevec(idxs, vals)
-
         doc_len = doc_lens.get(node.id_, 0)
 
         main_rows.append(
@@ -257,7 +216,6 @@ def upsert_data(
                 payload.metadata.file_name,
                 payload.metadata.file_path,
                 dense_vec,
-                sparse_vec,
                 doc_len,
             )
         )

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from .doc import RetrievedDocument
+from ._doc import RetrievedDocument
 
 
 class IngestionResponse(BaseModel):
