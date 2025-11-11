@@ -1,4 +1,4 @@
-# CS419-RAG
+# Audio2Text RAG - CS431 Final Project
 
 ## Architecture Diagrams
 
@@ -19,10 +19,10 @@ flowchart TD
         A[/Documents/]
         B[Preprocessing]
         C[Dense vectorize]
-        D[Sparse vectorize]
+        D[Inverted Index Building]
         E[/Dense embeddings/]
-        F[/Sparse embeddings/]
-        G[(Qdrant DB)]
+        F[/Postings list/]
+        G[(Postgres DB)]
 
         A --> B
         B --> C --> E --> G
@@ -56,16 +56,16 @@ flowchart TD
     subgraph Users Retrieving
         A[User Queries]
         B[Dense vectorize]
-        C[Sparse vectorize]
+        C[Tokenize]
         D[/Query dense embeddings/]
-        E[/Query sparse embeddings/]
-        F[Querying DB]
-        G[(Qdrant DB)]
+        E[/Query's tokens/]
+        F[Retrieve from DB]
+        G[(Postgres DB)]
         H[Fusion]
         I[/Top-K Candidates/]
-        J[Reranking with Cross-Encoder]
+        J[Rerank with Cross-Encoder]
         K[/Reranked Candidates/]
-        L[Prompt Combine]
+        L[Prompt Augment]
         M[/Prompt with Context/]
         N[LLM Q&A]
         O[/Final Answers/]
@@ -76,8 +76,8 @@ flowchart TD
         A --> L --> M --> N --> O
 
         class A input;
-        class B,C,D,E,F,H,J,L,N process;
-        class I,K,M,O output;
+        class B,C,F,H,J,L,N process;
+        class D,E,I,K,M,O output;
         class G storage;
     end
 
@@ -90,9 +90,8 @@ flowchart TD
 ## To-dos
 
 - [x] Dense Embedding Retrieval (vector)
-- [x] Sparse Embedding Retrieval (vector)
+- [x] Text search (inverted index based)
 - [x] Hybrid Retrieval (vector)
 - [x] Reranking with Cross-Encoder
 - [x] Sparse Retrieval with Inverted Index (for presentation)
 - [ ] LLM Q&A
-- [ ] Dockerize the entire pipeline
