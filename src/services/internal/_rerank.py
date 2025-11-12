@@ -1,7 +1,5 @@
 import torch
-import torch.nn.functional as F
 from functools import lru_cache
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from sentence_transformers import CrossEncoder
 from src import schemas
 from src.core import config

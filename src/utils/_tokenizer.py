@@ -15,15 +15,15 @@ def tokenize(
     tokenized_texts = [word_tokenize(text.lower()) for text in texts]
 
     # Remove punctuation
-    punc_removed_toks_list = [
+    punc_removed_tok_lists = [
         [token for token in tokens if token not in string.punctuation]
         for tokens in tokenized_texts
     ]
 
     # Remove stopwords
-    sw_removed_toks_list = [
+    sw_removed_tok_lists = [
         [token for token in tokens if token not in _stopwords]
-        for tokens in punc_removed_toks_list
+        for tokens in punc_removed_tok_lists
     ]
 
-    return sw_removed_toks_list
+    return sw_removed_tok_lists
