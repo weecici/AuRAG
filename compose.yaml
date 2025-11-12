@@ -1,12 +1,16 @@
 services:
   db:
     image: pgvector/pgvector:pg18
+    env_file:
+      - .env
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
-    env_file:
-      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pg}
+      POSTGRES_DB: ${POSTGRES_DB:-cs431_db}
 
   # backend:
   #   build: .
