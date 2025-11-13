@@ -35,3 +35,4 @@ POSTGRES_DB = os.getenv("POSTGRES_DB", "cs419_db")
 
 # local storage
 LOCAL_STORAGE_PATH = os.getenv("LOCAL_STORAGE_PATH", "./.storage")
+AUDIO_STORAGE_PATH = os.path.join(LOCAL_STORAGE_PATH, "audio")
