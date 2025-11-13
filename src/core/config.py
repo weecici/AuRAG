@@ -35,4 +35,8 @@ POSTGRES_DB = os.getenv("POSTGRES_DB", "cs419_db")
 
 # local storage
 LOCAL_STORAGE_PATH = os.getenv("LOCAL_STORAGE_PATH", "./.storage")
-AUDIO_STORAGE_PATH = os.path.join(LOCAL_STORAGE_PATH, "audio")
+AUDIO_STORAGE_PATH = os.path.join(LOCAL_STORAGE_PATH, "audios")
+TRANSCRIPT_STORAGE_PATH = os.path.join(LOCAL_STORAGE_PATH, "transcripts")
+
+# speech to text
+SPEECH2TEXT_MODEL = os.getenv("SPEECH2TEXT_MODEL", "small")

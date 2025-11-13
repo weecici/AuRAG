@@ -4,3 +4,4 @@ from ._process_docs import process_documents
 from ._rerank import rerank
 from ._augment import augment_prompts
 from ._chat import generate
+from ._speech2text import transcribe_audio
