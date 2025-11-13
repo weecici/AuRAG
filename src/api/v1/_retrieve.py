@@ -21,7 +21,7 @@ async def retrieve_documents(ctx: inngest.Context) -> dict[str, any]:
     "/retrieve",
     response_model=schemas.RetrievalResponse,
     summary="Retrieve relevant documents",
-    description="Triggers an asynchronous job to retrieve documents based on the provided queries.",
+    description="Retrieve documents based on the provided queries.",
 )
 async def retrieve(request: schemas.RetrievalRequest) -> schemas.RetrievalResponse:
     return public_svcs.retrieve_documents(request)

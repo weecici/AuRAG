@@ -21,7 +21,7 @@ async def generate_responses(ctx: inngest.Context) -> dict[str, any]:
     "/generate",
     response_model=schemas.GenerationResponse,
     summary="Generate responses from documents",
-    description="Triggers an asynchronous job to generate responses based on the provided queries and retrieved documents.",
+    description="Generate responses based on the provided queries and retrieved documents.",
 )
 async def generate(request: schemas.GenerationRequest) -> schemas.GenerationResponse:
     return public_svcs.generate_responses(request)

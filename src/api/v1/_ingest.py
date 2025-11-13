@@ -18,10 +18,32 @@ async def ingest_documents(ctx: inngest.Context) -> dict[str, any]:
 
 
 @router.post(
-    "/ingest",
+    "/ingest/documents",
     response_model=schemas.IngestionResponse,
-    summary="Start document ingestion",
-    description="Triggers an asynchronous job to ingest documents from the specified file paths or directory.",
+    summary="Document ingestion",
+    description="Ingest documents from the specified file paths or directory.",
 )
-async def ingest(request: schemas.IngestionRequest) -> schemas.IngestionResponse:
+async def ingest(
+    request: schemas.DocumentIngestionRequest,
+) -> schemas.IngestionResponse:
+    return public_svcs.ingest_documents(request)
+
+
+@inngest_client.create_function(
+    fn_id="ingest-audios",
+    trigger=inngest.TriggerEvent(event="rag/ingest-audios"),
+    retries=0,
+)
+async def ingest_audios(ctx: inngest.Context) -> dict[str, any]:
+    request = schemas.IngestionRequest.model_validate(ctx.event.data)
+    return public_svcs.ingest_audios(request).model_dump()
+
+
+@router.post(
+    "/ingest/audios",
+    response_model=schemas.IngestionResponse,
+    summary="Audio ingestion",
+    description="Ingest audio files from the specified file paths or youtube links.",
+)
+async def ingest(request: schemas.AudioIngestionRequest) -> schemas.IngestionResponse:
     return public_svcs.ingest_documents(request)

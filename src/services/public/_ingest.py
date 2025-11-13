@@ -9,7 +9,9 @@ from src.services.internal import (
 from src.repo.postgres import upsert_data
 
 
-def ingest_documents(request: schemas.IngestionRequest) -> schemas.IngestionResponse:
+def ingest_documents(
+    request: schemas.DocumentIngestionRequest,
+) -> schemas.IngestionResponse:
     try:
         if not request.file_paths and not request.file_dir:
             raise ValueError("No file paths or directory provided in event data.")
@@ -70,3 +72,7 @@ def ingest_documents(request: schemas.IngestionRequest) -> schemas.IngestionResp
         return schemas.IngestionResponse(
             status=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)
         )
+
+
+def ingest_audios(request: schemas.AudioIngestionRequest) -> schemas.IngestionResponse:
+    return

@@ -2,12 +2,24 @@ from pydantic import BaseModel, Field
 from typing import Literal
 
 
-class IngestionRequest(BaseModel):
+class DocumentIngestionRequest(BaseModel):
     file_paths: list[str] = Field(
         default=[], description="List of file paths to ingest documents from"
     )
     file_dir: str = Field(
         default="", description="Directory containing files to ingest"
+    )
+    collection_name: str = Field(
+        default="documents", description="Name of the Qdrant collection"
+    )
+
+
+class AudioIngestionRequest(BaseModel):
+    file_paths: list[str] = Field(
+        default=[], description="List of file paths to ingest audio files from"
+    )
+    links: list[str] = Field(
+        default=[], description="List of YouTube links to ingest audio sources from"
     )
     collection_name: str = Field(
         default="documents", description="Name of the Qdrant collection"
