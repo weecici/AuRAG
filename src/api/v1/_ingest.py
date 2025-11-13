@@ -35,7 +35,7 @@ async def ingest(
     retries=0,
 )
 async def ingest_audios(ctx: inngest.Context) -> dict[str, any]:
-    request = schemas.IngestionRequest.model_validate(ctx.event.data)
+    request = schemas.AudioIngestionRequest.model_validate(ctx.event.data)
     return public_svcs.ingest_audios(request).model_dump()
 
 
@@ -46,4 +46,4 @@ async def ingest_audios(ctx: inngest.Context) -> dict[str, any]:
     description="Ingest audio files from the specified file paths or youtube links.",
 )
 async def ingest(request: schemas.AudioIngestionRequest) -> schemas.IngestionResponse:
-    return public_svcs.ingest_documents(request)
+    return public_svcs.ingest_audios(request)

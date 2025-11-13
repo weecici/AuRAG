@@ -40,25 +40,36 @@ def transcribe_audio(
 
     transcripts = []
     for audio_path in audio_paths:
-        logger.info(f"Transcribing audio file: {audio_path}")
+        try:
+            logger.info(f"Transcribing audio file: {audio_path}")
 
-        result = model.transcribe(audio_path, language=language, fp16=use_fp16)
+            result = model.transcribe(audio_path, language=language, fp16=use_fp16)
 
-        transcript = ""
-        for seg in result["segments"]:
-            s, e, t = seg["start"], seg["end"], seg["text"].strip()
-            transcript += f"[{s:.2f}s - {e:.2f}s] {t}\n"
+            transcript = ""
+            for seg in result["segments"]:
+                s, e, t = seg["start"], seg["end"], seg["text"].strip()
+                transcript += f"[{s:.2f}s - {e:.2f}s] {t}\n"
 
-        transcripts.append(transcript)
+            transcripts.append(transcript)
+            logger.info(f"Completed transcription for: {audio_path}")
+        except Exception as e:
+            logger.error(f"Error transcribing {audio_path}: {e}")
+            transcripts.append("")
+            continue
 
+    filenames = []
     for audio_path, transcript in zip(audio_paths, transcripts):
+        if transcript == "":
+            continue
         audio_filename = Path(audio_path).stem
         transcript_path = os.path.join(out_dir, f"{audio_filename}.txt")
         with open(transcript_path, "w", encoding="utf-8") as f:
             f.write(transcript)
 
+        filenames.append(transcript_path)
+
     if device == "cuda":
         model.to(device="cpu")
         torch.cuda.empty_cache()
 
-    return transcripts
+    return filenames

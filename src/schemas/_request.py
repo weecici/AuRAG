@@ -10,7 +10,7 @@ class DocumentIngestionRequest(BaseModel):
         default="", description="Directory containing files to ingest"
     )
     collection_name: str = Field(
-        default="documents", description="Name of the Qdrant collection"
+        default="documents", description="Name of the collection"
     )
 
 
@@ -18,18 +18,18 @@ class AudioIngestionRequest(BaseModel):
     file_paths: list[str] = Field(
         default=[], description="List of file paths to ingest audio files from"
     )
-    links: list[str] = Field(
-        default=[], description="List of YouTube links to ingest audio sources from"
+    urls: list[str] = Field(
+        default=[], description="List of YouTube URLs to ingest audio sources from"
     )
     collection_name: str = Field(
-        default="documents", description="Name of the Qdrant collection"
+        default="documents", description="Name of the collection"
     )
 
 
 class RetrievalRequest(BaseModel):
     queries: list[str] = Field(..., description="The list of query texts")
     collection_name: str = Field(
-        default="documents", description="Name of the Qdrant collection"
+        default="documents", description="Name of the collection"
     )
     top_k: int = Field(
         default=5, description="Number of top similar documents to retrieve"

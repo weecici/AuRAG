@@ -1,12 +1,13 @@
 from fastapi import status
 from src import schemas
-from src.utils import logger
+from src.utils import logger, download_audio
+from src.repo.postgres import upsert_data
 from src.services.internal import (
     process_documents,
     dense_encode,
     build_inverted_index,
+    transcribe_audio,
 )
-from src.repo.postgres import upsert_data
 
 
 def ingest_documents(
@@ -75,4 +76,39 @@ def ingest_documents(
 
 
 def ingest_audios(request: schemas.AudioIngestionRequest) -> schemas.IngestionResponse:
-    return
+    try:
+        if not request.file_paths and not request.urls:
+            raise ValueError("No audio file paths or URLs provided in request data.")
+
+        logger.info(
+            f"Starting audio ingestion process to the collection '{request.collection_name}'..."
+        )
+
+        download_filepaths = download_audio(urls=request.urls)
+        total_filepaths = request.file_paths + download_filepaths
+
+        transcript_paths = transcribe_audio(audio_paths=total_filepaths)
+        if len(transcript_paths) == 0:
+            raise ValueError("No transcripts were generated from the provided audios.")
+
+        doc_ingest_request = schemas.DocumentIngestionRequest(
+            collection_name=request.collection_name, file_paths=transcript_paths
+        )
+
+        transcript_ingest_response = ingest_documents(request=doc_ingest_request)
+
+        if transcript_ingest_response.status != status.HTTP_201_CREATED:
+            raise ValueError(
+                f"Document ingestion failed during audio ingestion: {transcript_ingest_response.message}"
+            )
+
+        return schemas.IngestionResponse(
+            status=status.HTTP_200_OK,
+            message=f"Ingested {len(total_filepaths)} audio files into collection '{request.collection_name}'.",
+        )
+    except Exception as e:
+        logger.error(f"Error while ingesting audios: {e}")
+
+        return schemas.IngestionResponse(
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)
+        )
