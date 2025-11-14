@@ -49,11 +49,8 @@ def process_documents(file_paths: list[str], file_dir: str) -> list[TextNode]:
 
         doc.doc_id = audio_url
 
-        chunks: list[tuple[str, str]] = []
-        if _is_transcript_file(filepath):
-            chunks = chunk_transcript(transcript=doc.text)
-        # else:
-        #     chunks = splitter.split_text(doc.text)
+        text_type = "transcript" if _is_transcript_file(filepath) else "document"
+        chunks = chunk_transcript(raw_text=doc.text, text_type=text_type)
 
         for title, chunk in chunks:
             node_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{title}_{doc.doc_id}"))
