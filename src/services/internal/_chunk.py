@@ -1,6 +1,7 @@
 import os
 import asyncio
 from google import genai
+from google.genai import types
 from typing import Literal
 from functools import lru_cache
 from src.core import config
@@ -37,7 +38,7 @@ Behavior rules:
 ==========
 (repeat for all chunks)
 
-10. Do not use any markdown styling (no bold, italic, underline). Do not convert math to LaTeX. Keep math expressions verbatim. (this rule is VERY IMPORTANT FOR MY RETRIEVAL SYSTEM TO WORK CORRECTLY)
+10. Do not use any markdown styling (no bold, italic, underline). Do not convert math to LaTeX, try best effort to keep the math expressions verbatim. (this rule is the MOST IMPORTANT FOR MY RETRIEVAL SYSTEM TO WORK CORRECTLY as you always convert math to LaTeX, which is not what I want)
 11. Do not add any commentary, metadata, or notes outside the specified format. The assistant's response must contain only the chunks formatted as above.
 
 Now process the transcript below using these rules **(slowly and carefully)**:
@@ -165,12 +166,17 @@ async def chunk_text(
 
         logger.info(f"Sending chunking request for type **{text_type}**...")
 
-        # The Google GenAI SDK call is synchronous; run it in a worker thread so
-        # multiple chunk_text tasks can progress concurrently without blocking the event loop.
+        model_config = types.GenerateContentConfig(
+            system_instruction="You are an expert in chunking text accurately and efficiently into relevant segments.",
+            thinking_config=types.ThinkingConfig(thinking_budget=24576),
+        )
         sem = _get_semaphore()
         async with sem:
             response = await asyncio.to_thread(
-                client.models.generate_content, model=MODEL_ID, contents=prompt
+                client.models.generate_content,
+                model=MODEL_ID,
+                contents=prompt,
+                config=model_config,
             )
 
         chunks = parse_response_into_chunks(

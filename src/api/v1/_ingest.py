@@ -13,7 +13,7 @@ router = APIRouter()
     retries=0,
 )
 async def ingest_documents(ctx: inngest.Context) -> dict[str, any]:
-    request = schemas.IngestionRequest.model_validate(ctx.event.data)
+    request = schemas.DocumentIngestionRequest.model_validate(ctx.event.data)
     return public_svcs.ingest_documents(request).model_dump()
 
 
@@ -23,7 +23,7 @@ async def ingest_documents(ctx: inngest.Context) -> dict[str, any]:
     summary="Document ingestion",
     description="Ingest documents from the specified file paths or directory.",
 )
-async def ingest(
+async def ingest_documents_2(
     request: schemas.DocumentIngestionRequest,
 ) -> schemas.IngestionResponse:
     return public_svcs.ingest_documents(request)
@@ -45,5 +45,7 @@ async def ingest_audios(ctx: inngest.Context) -> dict[str, any]:
     summary="Audio ingestion",
     description="Ingest audio files from the specified file paths or youtube links.",
 )
-async def ingest(request: schemas.AudioIngestionRequest) -> schemas.IngestionResponse:
+async def ingest_audios_2(
+    request: schemas.AudioIngestionRequest,
+) -> schemas.IngestionResponse:
     return await public_svcs.ingest_audios(request)
