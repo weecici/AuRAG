@@ -36,7 +36,7 @@ if "settings" not in st.session_state:
     st.session_state.settings = {
         "api_base": get_default_api_base(),
         "collection_name": "cs431",
-        "top_k": 5,
+        "top_k": 10,
         "mode": "hybrid",
         "overfetch_mul": 2.0,
         "rerank_enabled": False,
@@ -313,9 +313,11 @@ def render_sources(docs: List[schemas.RetrievedDocument]):
             title, start, end = parts[0].strip(), parts[1].strip(), parts[2].strip()
             video_id = Path(meta.file_path).stem.split("$")[1].strip()
             video_url = f"https://youtu.be/{video_id}?t={start}"
-            src_title = f"Source {idx}: {title} (from {start}s to {end}s)"
+            src_title = (
+                f"Source {idx}: {title} (from {start}s to {end}s in {meta.file_name})"
+            )
         else:
-            src_title = f"Source {idx}: {meta.title}"
+            src_title = f"Source {idx}: {meta.title} (in {meta.file_name})"
         with st.expander(src_title):
             if video_url:
                 st.link_button(
@@ -418,7 +420,6 @@ def render_chat():
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
             if msg["role"] == "assistant" and msg.get("sources"):
-                render_sources(msg["sources"])  # type: ignore[arg-type]
                 render_sources(msg["sources"])  # type: ignore[arg-type]
 
     # Input (disabled while generating) - stays at bottom center; settings panel is fixed left

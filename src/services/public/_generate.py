@@ -27,8 +27,10 @@ async def generate_responses(
             model=request.model_name,
         )
 
+        documents_text = [[doc.payload.text for doc in docs] for docs in retrieved_docs]
+
         sum_prompts = get_summarization_prompts(
-            documents_list=retrieved_docs,
+            documents_list=documents_text,
         )
 
         sum_responses = generate(

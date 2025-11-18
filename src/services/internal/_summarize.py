@@ -36,15 +36,15 @@ Now process the provided documents according to the rules above:
 
 
 def get_summarization_prompts(
-    documents_list: list[list[schemas.RetrievedDocument]],
+    documents_list: list[list[str]],
 ) -> list[str]:
     prompts: list[str] = []
     for documents in documents_list:
-        doc_texts = [f"{i + 1}. " + d.payload.text for i, d in enumerate(documents)]
+        doc_texts = [f"{i + 1}. " + d for i, d in enumerate(documents)]
         prompt = prompt_template.format(
-            documents="\n\n".join(doc_texts),
-            max_sum_len=150,
-            min_len_to_sum=200,
+            documents="\n\n==========\n".join(doc_texts),
+            max_sum_len=50,
+            min_len_to_sum=100,
             lang="vi",
         )
         prompts.append(prompt)
