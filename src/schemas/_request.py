@@ -56,3 +56,6 @@ class GenerationRequest(RetrievalRequest):
         default="gpt-oss-120b",
         description="Name of the LLM to use for generation",
     )
+    summarization_enabled: bool = Field(
+        default=False, description="Whether to perform document summarization"
+    )

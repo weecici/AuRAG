@@ -309,20 +309,22 @@ def render_sources(docs: List[schemas.RetrievedDocument]):
         meta = d.payload.metadata
         parts = meta.title.split("||")
         video_url = None
+        start_time = None
         if len(parts) == 3:
-            title, start, end = parts[0].strip(), parts[1].strip(), parts[2].strip()
-            video_id = Path(meta.file_path).stem.split("$")[1].strip()
-            video_url = f"https://youtu.be/{video_id}?t={start}"
-            src_title = (
-                f"Source {idx}: {title} (from {start}s to {end}s in {meta.file_name})"
+            title, start_time, end_time = (
+                parts[0].strip(),
+                parts[1].strip(),
+                parts[2].strip(),
             )
+            video_id = Path(meta.file_path).stem.split("$")[1].strip()
+            video_url = f"https://youtu.be/{video_id}"
+            src_title = f"Source {idx}: {title} (from {start_time}s to {end_time}s in {meta.file_name})"
         else:
             src_title = f"Source {idx}: {meta.title} (in {meta.file_name})"
         with st.expander(src_title):
             if video_url:
-                st.link_button(
-                    label=f"▶ Play now on Youtube: {meta.file_name}", url=video_url
-                )
+                st.video(video_url, start_time=(int(start_time)))
+                st.caption(f"▶ {meta.file_name}")
             st.markdown(f"**File name:** `{meta.file_name}`")
             st.markdown(f"**Path:** `{meta.file_path}`")
             st.markdown("---")

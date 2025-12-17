@@ -27,26 +27,27 @@ async def generate_responses(
             model=request.model_name,
         )
 
-        documents_text = [[doc.payload.text for doc in docs] for docs in retrieved_docs]
+        docs = retrieved_docs
 
-        sum_prompts = get_summarization_prompts(
-            documents_list=documents_text,
-        )
+        if request.summarization_enabled:
+            documents_text = [
+                [doc.payload.text for doc in docs] for docs in retrieved_docs
+            ]
 
-        sum_responses = generate(
-            prompts=sum_prompts,
-            model=request.model_name,
-        )
+            sum_prompts = get_summarization_prompts(documents_list=documents_text)
 
-        parsed_summaries_list = parse_summarization_responses(
-            responses=sum_responses,
-            documents_list=retrieved_docs,
-        )
+            sum_responses = generate(prompts=sum_prompts, model=request.model_name)
+
+            parsed_summaries_list = parse_summarization_responses(
+                responses=sum_responses,
+                documents_list=retrieved_docs,
+            )
+            docs = parsed_summaries_list
 
         return schemas.GenerationResponse(
             status=status.HTTP_200_OK,
             responses=qa_responses,
-            summarized_docs_list=parsed_summaries_list,
+            summarized_docs_list=docs,
         )
     except Exception as e:
         logger.error(f"Error during generation process: {str(e)}")
