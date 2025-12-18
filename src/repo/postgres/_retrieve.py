@@ -152,7 +152,8 @@ def sparse_search(
 
         # Simple caches to avoid redundant queries within the same request batch
         df_cache: dict[str, int] = {}
-        dl_cache: dict[str, int] = {}
+        # Cache stores (doc_len, payload)
+        doc_cache: dict[str, tuple[int, schemas.DocumentPayload]] = {}
 
         for q_idx, tokens in enumerate(tokenized_texts):
             term_counts = Counter(tokens)
@@ -182,8 +183,8 @@ def sparse_search(
                     sid = str(doc_id)
 
                     # fetch payload + doc_len
-                    if sid in dl_cache:
-                        dl = dl_cache[sid]
+                    if sid in doc_cache:
+                        dl, payload = doc_cache[sid]
                     else:
                         cur.execute(doc_select, (doc_id,))
                         drow = cur.fetchone()
@@ -208,8 +209,10 @@ def sparse_search(
                                 file_path=file_path or "",
                             ),
                         )
+                        dl = int(dl) if dl is not None else 0
+                        doc_cache[sid] = (dl, payload)
 
-                        dl_cache[sid] = int(dl) if dl is not None else 0
+                    if sid not in doc_scores:
                         doc_scores[sid] = schemas.RetrievedDocument(
                             id=sid,
                             score=0.0,
