@@ -76,6 +76,7 @@ if __name__ == "__main__":
             "iou": 0.0,
             "oracle_iou": 0.0,
             "ndcg_iou": 0.0,
+            "mrr": 0.0,
         }
 
         for i, docs in enumerate(res.results):
@@ -90,8 +91,9 @@ if __name__ == "__main__":
             ious = []
 
             retrieved_by_video = {}
+            first_relevant_rank = None
 
-            for doc in docs:
+            for idx, doc in enumerate(docs):
                 try:
                     _, start, end = doc.payload.metadata.title.split("||")
                     start, end = int(start), int(end)
@@ -119,9 +121,16 @@ if __name__ == "__main__":
                     overlap = get_overlap(gt_start, gt_end, start, end)
                     union = gt_len + (end - start) - overlap
 
+                if overlap > 0 and first_relevant_rank is None:
+                    first_relevant_rank = idx + 1
+
                 overlaps.append(overlap)
                 recalls.append(overlap / gt_len if gt_len > 0 else 0)
                 ious.append(overlap / union if union > 0 else 0)
+
+            # MRR
+            if first_relevant_rank:
+                metrics_sum["mrr"] += 1.0 / first_relevant_rank
 
             # Cumulative Recall
             metrics_sum["cumulative_recall"] += sum(recalls)
